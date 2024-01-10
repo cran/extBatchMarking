@@ -190,11 +190,7 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
   }
 
   if(hessian) res$hessian <- opt_ma$hessian
-  if(parallel) {
-
-    parallel::stopCluster(cl = cluster)
-    doParallel::stopImplicitCluster()
-  }
+  if(parallel)parallel::stopCluster(cl = cluster)
 
   return(res)
 
@@ -470,11 +466,7 @@ batchMarkUnmarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2
   res$N <- res$U + res$M
 
   if(hessian) res$hessian <- opt_ma$hessian
-  if(parallel) {
-
-    parallel::stopCluster(cl = cluster)
-    doParallel::stopImplicitCluster()
-  }
+  if(parallel)parallel::stopCluster(cl = cluster)
 
   return(res)
 

@@ -18,7 +18,7 @@ library(RcppDist)
 
 
 #include <RcppArmadillo.h>
-#include <omp.h>
+//#include <omp.h>
 #include <math.h>
 #include <Rcpp.h>
 
@@ -31,8 +31,8 @@ using namespace arma;
 arma::mat gamma_gt(int R, double phi, int cores){
 
   // Parallel
-  omp_set_dynamic(0);     // Explicitly disable dynamic teams
-  omp_set_num_threads(cores);
+  //omp_set_dynamic(0);     // Explicitly disable dynamic teams
+  //omp_set_num_threads(cores);
 
   // declare our variables
 

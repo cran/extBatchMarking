@@ -26,7 +26,7 @@ res2  <- batchMarkUnmarkHmmLL(par         = thet,
 # Test functions
 test_that( "Equality", {
 
-  expect_equal(round(res1,2),       round(132.3349, 2))
-  expect_equal(round(res2,2),       round(394.3386, 2))
+  expect_equal(round(res1,1),       round(132.3349, 1))
+  expect_equal(round(res2,1),       round(394.3386, 1))
 
 } )

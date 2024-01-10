@@ -1,9 +1,9 @@
-90fed716a5ad20b7864e8b6d4851aacf *DESCRIPTION
+1f5b256a6e4e4438ba0f9579a879cef4 *DESCRIPTION
 cf141d250aa073d378960b27b5bc1076 *NAMESPACE
 240b51465b904e519cdcf5debf9156e8 *R/RcppExports.R
 c6d86f8e24ff29ce2737b4c79c040d0d *R/WeatherLoach.R
 a7f7265e0185cf57afa3f3af3015d79c *R/batchMark.R
-9f39707e1753a696a435c08beb3ea403 *R/batchMarkfun.R
+ccecc2e1f18a7d066785c1e38a0a0e31 *R/batchMarkfun.R
 c98279c16bbe3ecb34fb8583c79782df *R/extBatchMarking-package.R
 ace7e29a47b90c68955752ef40e1c62a *README.md
 b943a1546a1e17be4eea235ec7b4616b *build/partial.rdb
@@ -26,6 +26,6 @@ e28f692ef8265c5915f91e5e1dbf3130 *man/probs.Rd
 c89d6b95d18721894ab45341d0fbc7a6 *src/Makevars
 c89d6b95d18721894ab45341d0fbc7a6 *src/Makevars.win
 9d4eaeae3eb9cfbfedc4549d9cb83886 *src/RcppExports.cpp
-899585e772a82930803b7060016b4a1c *src/transProb.cpp
+51ba8b3dd7f1a72a285006d99141e539 *src/transProb.cpp
 d50aea2cbfa5606bbbcd356e50750679 *tests/testthat.R
-11af8662f87da6ee5d489b6b82029690 *tests/testthat/testextBatchMarking.R
+c7ed6bd1bd54f416319bdab74c766c40 *tests/testthat/testextBatchMarking.R
