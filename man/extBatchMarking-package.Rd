@@ -11,8 +11,8 @@ A system for batch-marking data analysis to estimate survival probabilities, cap
 \seealso{
 Useful links:
 \itemize{
-  \item \url{https://github.com/Olobatuyi/extBatchMarking}
-  \item Report bugs at \url{https://github.com/Olobatuyi/extBatchMarking/issues}
+  \item \url{https://github.com/Olobatuyi/extBatchMarking_cov}
+  \item Report bugs at \url{https://github.com/Olobatuyi/extBatchMarking_cov/issues}
 }
 
 }

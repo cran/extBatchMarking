@@ -12,21 +12,20 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // gamma_gt
-arma::mat gamma_gt(int R, double phi, int cores);
-RcppExport SEXP _extBatchMarking_gamma_gt(SEXP RSEXP, SEXP phiSEXP, SEXP coresSEXP) {
+arma::mat gamma_gt(int R, double phi);
+RcppExport SEXP _extBatchMarking_gamma_gt(SEXP RSEXP, SEXP phiSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< int >::type R(RSEXP);
     Rcpp::traits::input_parameter< double >::type phi(phiSEXP);
-    Rcpp::traits::input_parameter< int >::type cores(coresSEXP);
-    rcpp_result_gen = Rcpp::wrap(gamma_gt(R, phi, cores));
+    rcpp_result_gen = Rcpp::wrap(gamma_gt(R, phi));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_extBatchMarking_gamma_gt", (DL_FUNC) &_extBatchMarking_gamma_gt, 3},
+    {"_extBatchMarking_gamma_gt", (DL_FUNC) &_extBatchMarking_gamma_gt, 2},
     {NULL, NULL, 0}
 };
 

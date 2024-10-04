@@ -11,7 +11,7 @@
 #' @name gamma_gt
 NULL
 
-gamma_gt <- function(R, phi, cores) {
-    .Call(`_extBatchMarking_gamma_gt`, R, phi, cores)
+gamma_gt <- function(R, phi) {
+    .Call(`_extBatchMarking_gamma_gt`, R, phi)
 }
 

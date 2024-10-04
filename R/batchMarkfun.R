@@ -1,16 +1,15 @@
 #' @title Marked model only.
 
-#' @description batchMarkOptim function provides the batch marking function to be optimized.
+#' @description batchMarkOptim function optimizes \code{\link{batchMarkHmmLL}} function.
 #'
 #' @param par Initial values for the parameters to be optimized over.
 #' @param data A capture-recapture data matrix or data frame
 #' @param choiceModel This chooses among different models and allow for model selection
-#' @param cores The number of cores for parallelization
+#' @param covariate_phi This covariate placeholder for the parameter phi_t
+#' @param covariate_p This covariate placeholder for the parameter p_t
 #' @param method The method to be used. See \code{\link{optim}} for details.
 #' @param lowerBound Lower bounds on the variables for the "L-BFGS-B" \code{method}.
-#' @param parallel Logical. Should the algorithm be run in parallel? This will be implemented in a future version.
 #' @param control A list of control parameters. See optim for details.
-#' @param hessian Logical. Should a numerically differentiated Hessian matrix be returned?
 #' @param ... Further arguments to be passed by user which goes into the \code{\link{optim}} function.
 
 #' @details
@@ -31,7 +30,7 @@
 #'  \item{phi}{The survival probability and remaining in the population between occasion t and t+1.}
 #'  \item{p}{The capture probability at occasion time t.}
 #'  \item{ll}{The optimized log-likelihood value of marked model.}
-#'  \item{hessian}{The hessian matrix.}
+#'  \item{SE}{The standard error for each parameter.}
 #'  \item{AIC}{The Akaike Information Criteria for model selection.}
 #' }
 #'
@@ -49,14 +48,15 @@
 #'
 #' \donttest{
 #' mod1 <- batchMarkOptim(
-#'            par         = theta,
-#'            data        = WeatherLoach,
-#'            choiceModel = "model4",
-#'            method      = "BFGS",
-#'            parallel    = FALSE,
-#'            hessian     = TRUE,
-#'            control     = list(trace = 1)
-#'      )
+#'            par           = theta,
+#'            data          = WeatherLoach,
+#'            choiceModel   = "model4",
+#'            method        = "BFGS",
+#'            control       = list(trace = 1),
+#'            covariate_phi = NULL,
+#'            covariate_p   = NULL)
+#'
+#'  # print(mod1)
 #'
 #'  # Survival probability
 #'  mod1$phi
@@ -64,63 +64,34 @@
 #'  mod1$p
 #'  # Optimized log-likelihood
 #'  mod1$ll
-#'  # The Hessian matrix
-#'  mod1$hessian
 #'  # The Aikaike Information Criteria
 #'  mod1$AIC
 #'  }
 #'
 #'  \donttest{
 #'  mod2 <- batchMarkOptim(
-#'            par         = theta,
-#'            data        = WeatherLoach,
-#'            choiceModel = "model4",
-#'            method      = "L-BFGS-B",
-#'            parallel    = FALSE,
-#'            hessian     = TRUE,
-#'            control     = list(trace = 1))
+#'            par           = theta,
+#'            data          = WeatherLoach,
+#'            choiceModel   = "model4",
+#'            method        = "L-BFGS-B",
+#'            control       = list(trace = 1),
+#'            covariate_phi = NULL,
+#'            covariate_p   = NULL)
 #'
+#'  # print(mod2)
 #'  # Survival probability
 #'  mod2$phi
 #'  # Capture probability
 #'  mod2$p
 #'  # Optimized log-likelihood
 #'  mod2$ll
-#'  # The Hessian matrix
-#'  mod2$hessian
 #'  # The Akaike Information Criteria
 #'  mod2$AIC
 #'  }
 
 
-batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "model3", "model4"),
-                           method=c("Nelder-Mead","BFGS", "CG", "L-BFGS-B"),parallel=FALSE, lowerBound=-Inf,
-                           cores=1, hessian=FALSE, control, ...){
-
-  # my_packages <- c("Rcpp", "parallel", "optimParallel", "RcppArmadillo")                  # Specify your packages
-  # not_installed <- my_packages[!(my_packages %in% installed.packages()[ , "Package"])]    # Extract not installed packages
-  # if(length(not_installed)) install.packages(not_installed) # Stop if not installed
-
-  if(parallel) {
-
-    cores   <- parallel::detectCores()-1
-    cluster <- parallel::makeCluster(cores)
-    doParallel::registerDoParallel(cluster, cores = cores)
-    parallel::clusterExport(cluster, "batchLogit",     envir=environment())
-    parallel::clusterExport(cluster, "probs",          envir=environment())
-    parallel::clusterExport(cluster, "delta_g",        envir=environment())
-    parallel::clusterExport(cluster, "batchLL",        envir=environment())
-    parallel::clusterExport(cluster, "batchMarkHmmLL", envir=environment())
-    parallel::clusterExport(cluster, "gamma_gt",       envir=environment())
-    parallel::clusterExport(cluster, "data",           envir=environment())
-    parallel::clusterExport(cluster, "%dopar%",        envir=environment())
-    parallel::clusterExport(cluster, "%do%",           envir=environment())
-    parallel::clusterExport(cluster, "%:%",            envir=environment())
-    parallel::clusterExport(cluster, "choiceModel",    envir=environment())
-
-  }
-
-  #choiceModel <- match.arg(choiceModel)
+batchMarkOptim <- function(par=NULL, data, covariate_phi = NULL, covariate_p = NULL, choiceModel=c("model1", "model2", "model3", "model4"),
+                           method=c("Nelder-Mead","BFGS", "CG", "L-BFGS-B"), lowerBound=-Inf, control, ...){
 
   # ChoiceModel must be one of the list
   if(!any(choiceModel == c("model1", "model2", "model3", "model4")))
@@ -128,13 +99,13 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
 
   # Check if length of par is appropriate for each model
   if(is.null(par) & choiceModel == "model1") {par <- c(rep(0, ncol(data)-1), rep(-1, ncol(data)-1))}
-  else if(!is.null(par) & choiceModel == "model1"){if(length(par) != 2*(ncol(data)-1)) stop(paste0("ERROR: par must be length: ", 2*(ncol(data)-1), ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model1"){if(length(par) != 2*(ncol(data)-1)) stop(paste0("par must be length: ", 2*(ncol(data)-1), ", not: ", length(par)))}
   if(is.null(par) & choiceModel == "model2") {par <- c(0, rep(-1, ncol(data)))}
-  else if(!is.null(par) & choiceModel == "model2"){if(length(par) != ncol(data)) stop(paste0("ERROR: par must be length: ", ncol(data), ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model2"){if(length(par) != ncol(data)) stop(paste0("par must be length: ", ncol(data), ", not: ", length(par)))}
   if(is.null(par) & choiceModel == "model3") {par <- c(0, rep(-1, ncol(data)-1))}
-  else if(!is.null(par) & choiceModel == "model3"){if(length(par) != ncol(data)) stop(paste0("ERROR: par must be length: ", ncol(data), ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model3"){if(length(par) != ncol(data)) stop(paste0("par must be length: ", ncol(data), ", not: ", length(par)))}
   if(is.null(par) & choiceModel == "model4") {par <- c(0, -1)}
-  else if(!is.null(par) & choiceModel == "model4"){if(length(par) != 2) stop(paste0("ERROR: par must be length: ", 2, ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model4"){if(length(par) != 2) stop(paste0("par must be length: ", 2, ", not: ", length(par)))}
 
 
   if(length(par) != length(lowerBound) && method == "L-BFGS-B"){
@@ -148,49 +119,98 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
     maxit = maxit
   }
 
-  opt_ma <- optim(par=par, fn=batchMarkHmmLL, data=data, choiceModel=choiceModel,
-                 cores=cores, method=method,lower=lowerBound, control = control, hessian = hessian,...)
+  opt_ma <- optim(par=par, fn=batchMarkHmmLL, data=data, covariate_phi = covariate_phi, covariate_p = covariate_p,
+                  choiceModel=choiceModel, method=method,lower=lowerBound, control = control, hessian = TRUE,...)
 
   res <- list()
 
   if(choiceModel == "model1") {
 
-    res$phi <- round(batchLogit(opt_ma$par[1:(ncol(data)-1)]),2)
-    res$p   <- round(batchLogit(opt_ma$par[ncol(data):(2*(ncol(data)-1))]),2)
-    res$ll  <- round(opt_ma$value, 2)
-    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$phi <- round(batchLogit(opt_ma$par[1:(ncol(data)-1)]),4)
+    res$p   <- round(batchLogit(opt_ma$par[ncol(data):(2*(ncol(data)-1))]),4)
+    res$ll  <- round(opt_ma$value, 4)
+    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
   else if(choiceModel == "model2") {
 
-    res$phi <- round(batchLogit(opt_ma$par[2:ncol(data)]),2)
-    res$p   <- round(batchLogit(opt_ma$par[1]),2)
-    res$ll  <- round(opt_ma$value, 2)
-    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$phi <- round(batchLogit(opt_ma$par[2:ncol(data)]),4)
+    res$p   <- round(batchLogit(opt_ma$par[1]),4)
+    res$ll  <- round(opt_ma$value, 4)
+    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
   else if(choiceModel == "model3") {
 
-    res$phi <- round(batchLogit(opt_ma$par[1]),2)
-    res$p   <- round(batchLogit(opt_ma$par[-1]),2)
-    res$ll  <- round(opt_ma$value, 2)
-    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$phi <- round(batchLogit(opt_ma$par[1]),4)
+    res$p   <- round(batchLogit(opt_ma$par[-1]),4)
+    res$ll  <- round(opt_ma$value, 4)
+    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
   else {
 
-    res$phi <- round(batchLogit(opt_ma$par[1]),2)
-    res$p   <- round(batchLogit(opt_ma$par[2]),2)
-    res$ll  <- round(opt_ma$value,2)
-    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$phi <- round(batchLogit(opt_ma$par[1]),4)
+    res$p   <- round(batchLogit(opt_ma$par[2]),4)
+    res$ll  <- round(opt_ma$value,4)
+    res$AIC <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
-  if(hessian) res$hessian <- opt_ma$hessian
-  if(parallel)parallel::stopCluster(cl = cluster)
+  serr_trans <- sqrt(diag(solve(opt_ma$hessian)))
+  serr       <- c(res$phi, res$p) * (1 - c(res$phi, res$p)) * serr_trans
+
+  if(choiceModel == "model1"){
+
+    res$SE_phi <- round(serr[1:(ncol(data)-1)], 4)
+    res$SE_p   <- round(serr[ncol(data):(2*(ncol(data)-1))], 4)
+
+  }else if(choiceModel == "model2"){
+
+    res$SE_phi <- round(serr[2:ncol(data)], 4)
+    res$SE_p   <- round(serr[1], 4)
+
+  }else if(choiceModel == "model3"){
+
+    res$SE_phi <- round(serr[1], 4)
+    res$SE_p   <- round(serr[-1], 4)
+
+  }else{
+
+    res$SE_phi <- round(serr[1], 4)
+    res$SE_p   <- round(serr[2], 4)
+
+  }
+
+  # Goodness of Fit ---------------------------------------------------------
+
+  # Compute Q_gt
+
+  phi <- res$phi
+  p   <- res$p
+
+  if(length(phi) == 1) phi <- rep(phi,(ncol(data)-1))
+  if(length(p)   == 1) p   <- rep(p, ncol(data))
+
+  R     <- data[-1,1]
+  Times <- ncol(data)
+  Q_gt     <- matrix(0, nrow = length(R), ncol = Times)
+
+  for (times in 2:Times) {
+    for (i in 1:(times-1)) Q_gt[i,times] <- p[times] * prod(phi[i:(times-1)])
+  }
+
+  exp_rgt   <- R * Q_gt[, 2:ncol(Q_gt)]
+  r_gt      <- data[2:nrow(data), 2:ncol(data)]
+  rgt_error <- (r_gt - exp_rgt) / sqrt(exp_rgt)
+
+  res$exp_rgt   <- exp_rgt
+  res$rgt_error <- rgt_error
+
+  class(res) <- "batchMarkOptim"
 
   return(res)
 
@@ -201,27 +221,26 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
 
 #' @title Combined Marked and Unmarked models.
 
-#' @description batchMarkUnmarkOptim function provides the batch marking and unmarked function to be optimized.
+#' @description batchMarkUnmarkOptim function optimizes \code{\link{batchMarkUnmarkHmmLL}} function.
 #'
 #' @param par Initial values for the parameters to be optimized over.
 #' @param data A capture-recapture data matrix or data frame
 #' @param choiceModel This chooses among different models and allow for model selection
-#' @param cores The number of cores for parallelization
+#' @param covariate_phi This covariate placeholder for the parameter phi_t
+#' @param covariate_p This covariate placeholder for the parameter p_t
 #' @param method The method to be used. See optim for details.
 #' @param popSize The Horvitz_Thompson method or Model-Based to compute population size.
 #' @param lowerBound Lower bounds on the variables for the "L-BFGS-B" method.
-#' @param parallel Logical. Should the algorithm be run in parallel? This will be implemented in a future version.
 #' @param Umax The maximum number of the unmarked individuals in the population for capture on any occasion.
 #' @param nBins The number of bin size into which the matrix will be divided.
 #' @param control a list of control parameters. See \code{\link{optim}} for details.
-#' @param hessian Logical. Should a numerically differentiated Hessian matrix be returned?
 #' @param ... Further arguments to be passed by user which goes into the optim function.
 #' @return A list of the following optimized parameters will be returned.
 #' \describe{
 #'  \item{phi}{The survival probability and remaining in the population between occasion t and t+1.}
 #'  \item{p}{The capture probability at occasion time t.}
 #'  \item{ll}{The optimized log-likelihood value of marked model.}
-#'  \item{hessian}{The hessian matrix.}
+#'  \item{SE}{The standard error for each parameter.}
 #'  \item{AIC}{The Akaike Information Criteria for model selection.}
 #'  \item{lambda}{Initial mean abundance at occasion t = 1.}
 #'  \item{gam}{Recruitment rate of individual into the unmarked population.}
@@ -241,7 +260,8 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
 #' Biometrics, 73, 1321-1331. DOI: 10.1111/biom.12701.
 #'
 #' @rdname batchMarkUnmarkOptim
-#' @importFrom stats optim dpois ppois
+#' @importFrom stats optim dpois ppois pbinom qnorm qqline qqnorm
+#' @importFrom graphics segments par
 #' @importFrom parallel makeCluster detectCores
 #' @importFrom doParallel registerDoParallel
 #' @importFrom utils install.packages installed.packages
@@ -262,11 +282,12 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
 #'            par         = theta,
 #'            data        = WeatherLoach,
 #'            Umax        = 1800,
-#'            nBins       = 20,
+#'            nBins       = 600,
+#'            covariate_phi = NULL,
+#'            covariate_p   = NULL,
 #'            choiceModel = "model4",
 #'            popSize    = "Horvitz_Thompson",
 #'            method      = "CG",
-#'            parallel    = FALSE,
 #'            control     = list(trace = 1))
 #'
 #'  # Survival probability
@@ -275,8 +296,6 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
 #'  mod1$p
 #'  # Optimized log-likelihood
 #'  mod1$ll
-#'  # The Hessian matrix
-#'  mod1$hessian
 #'  # The Aikaike Information Criteria
 #'  mod1$AIC
 #'  # The initial mean abundance
@@ -296,21 +315,22 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
 #'            par         = theta,
 #'            data        = WeatherLoach,
 #'            Umax        = 1800,
-#'            nBins       = 20,
+#'            nBins       = 600,
 #'            choiceModel = "model4",
+#'            covariate_phi = NULL,
+#'            covariate_p   = NULL,
 #'            popSize    = "Model-Based",
 #'            method      = "L-BFGS-B",
-#'            parallel    = FALSE,
 #'            control     = list(trace = 1))
 #'
+#'  # print(mod2)
+#'  # plot(mod2)
 #'  # Survival probability
 #'  mod2$phi
 #'  # Capture probability
 #'  mod2$p
 #'  # Optimized log-likelihood
 #'  mod2$ll
-#'  # The Hessian matrix
-#'  mod2$hessian
 #'  # The Akaike Information Criteria
 #'  mod2$AIC
 #'  # The initial mean abundance
@@ -327,37 +347,9 @@ batchMarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "mo
 
 
 batchMarkUnmarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2", "model3", "model4"),
+                                 covariate_phi = NULL, covariate_p = NULL,
                                  method=c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B"), Umax=1800, nBins=20,
-                                 popSize=c("Horvitz_Thompson", "Model-Based"), parallel=FALSE, lowerBound=-Inf,
-                                 cores=1, hessian=FALSE, control,...){
-
-  # my_packages   <- c("Rcpp", "parallel", "optimParallel", "RcppArmadillo")                # Specify your packages
-  # not_installed <- my_packages[!(my_packages %in% installed.packages()[ , "Package"])]    # Extract not installed packages
-  # if(length(not_installed)) utils::install.packages(not_installed)
-
-  if(parallel) {
-
-    cores   <- parallel::detectCores()-1
-    cluster <- parallel::makeCluster(cores)
-    doParallel::registerDoParallel(cluster, cores = cores)
-    parallel::clusterExport(cluster, "batchLogit",           envir=environment())
-    parallel::clusterExport(cluster, "probs",                envir=environment())
-    parallel::clusterExport(cluster, "delta_g",              envir=environment())
-    parallel::clusterExport(cluster, "batchLL",              envir=environment())
-    parallel::clusterExport(cluster, "batchMarkHmmLL",       envir=environment())
-    parallel::clusterExport(cluster, "gamma_gt",             envir=environment())
-    parallel::clusterExport(cluster, "data",                 envir=environment())
-    parallel::clusterExport(cluster, "%dopar%",              envir=environment())
-    parallel::clusterExport(cluster, "%do%",                 envir=environment())
-    parallel::clusterExport(cluster, "%:%",                  envir=environment())
-    parallel::clusterExport(cluster, "batchUnmarkHmmLL",     envir=environment())
-    parallel::clusterExport(cluster, "batchMarkUnmarkHmmLL", envir=environment())
-    parallel::clusterExport(cluster, "choiceModel",          envir = environment())
-    parallel::clusterExport(cluster, "popSize",              envir = environment())
-    parallel::clusterExport(cluster, "batchUnmark2Viterbi",  envir = environment())
-
-
-  }
+                                 popSize=c("Horvitz_Thompson", "Model-Based"), lowerBound=-Inf, control,...){
 
   # popSize must be one of the list
   if(!any(popSize == c("Horvitz_Thompson", "Model-Based")))
@@ -368,13 +360,13 @@ batchMarkUnmarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2
     stop("choiceModel must be one of the following: 'model1', 'model2', 'model3', or 'model4'")
 
   if(is.null(par) & choiceModel == "model1") {par <- c(rep(0.1, ncol(data)+ncol(data)-1), 7, -1.5)}
-  else if(!is.null(par) & choiceModel == "model1"){if(length(par) != ncol(data)+ncol(data)+1) stop(paste0("ERROR: par must be length: ", ncol(data)+ncol(data)+1, ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model1"){if(length(par) != ncol(data)+ncol(data)+1) stop(paste0("par must be length: ", ncol(data)+ncol(data)+1, ", not: ", length(par)))}
   if(is.null(par) & choiceModel == "model2") {par <- c(rep(0.1, ncol(data)), 7, -1.5)}
-  else if(!is.null(par) & choiceModel == "model2"){if(length(par) != ncol(data)+2) stop(paste0("ERROR: par must be length: ", ncol(data)+2, ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model2"){if(length(par) != ncol(data)+2) stop(paste0("par must be length: ", ncol(data)+2, ", not: ", length(par)))}
   if(is.null(par) & choiceModel == "model3") {par <- c(rep(0.1, ncol(data)+1), 7, -1.5)}
-  else if(!is.null(par) & choiceModel == "model3"){if(length(par) != ncol(data)+3) stop(paste0("ERROR: par must be length: ", ncol(data)+3, ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model3"){if(length(par) != ncol(data)+3) stop(paste0("par must be length: ", ncol(data)+3, ", not: ", length(par)))}
   if(is.null(par) & choiceModel == "model4") {par <- c(rep(0.1, 2), 7, -1.5)}
-  else if(!is.null(par) & choiceModel == "model4"){if(length(par) != 2*2) stop(paste0("ERROR: par must be length: ", 2*2, ", not: ", length(par)))}
+  else if(!is.null(par) & choiceModel == "model4"){if(length(par) != 2*2) stop(paste0("par must be length: ", 2*2, ", not: ", length(par)))}
 
   if(length(par) != length(lowerBound) && method == "L-BFGS-B"){
 
@@ -387,58 +379,61 @@ batchMarkUnmarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2
     maxit = maxit
   }
 
-  opt_ma <- optim(par=par, fn=batchMarkUnmarkHmmLL, data=data, choiceModel=choiceModel, Umax=Umax, nBins=nBins,
-                  cores=cores, method=method, lower=lowerBound, control=control, hessian=hessian, ...)
+  opt_ma <- optim(par=par, fn=batchMarkUnmarkHmmLL, data=data, covariate_phi = covariate_phi, covariate_p = covariate_p,
+                  choiceModel=choiceModel, Umax=Umax, nBins=nBins, method=method, lower=lowerBound, control=control, hessian=TRUE, ...)
 
   res <- list()
 
   if(choiceModel == "model1") {
 
-    res$phi    <- round(batchLogit(opt_ma$par[1:(ncol(data)-1)]),2)
-    res$p      <- round(batchLogit(opt_ma$par[ncol(data):(2*ncol(data)-1)]),2)
-    res$lambda <- round(exp(opt_ma$par[2*ncol(data)]),2)
-    res$gam    <- round(exp(opt_ma$par[2*ncol(data)+1]),2)
+    res$phi    <- round(batchLogit(opt_ma$par[1:(ncol(data)-1)]),4)
+    res$p      <- round(batchLogit(opt_ma$par[ncol(data):(2*ncol(data)-1)]),4)
+    res$lambda <- round(exp(opt_ma$par[2*ncol(data)]),4)
+    res$gam    <- round(exp(opt_ma$par[2*ncol(data)+1]),4)
     res$ll     <- round(opt_ma$value,2)
-    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
   else if(choiceModel == "model2") {
 
-    res$phi    <- round(batchLogit(opt_ma$par[2:ncol(data)]),2)
-    res$p      <- round(batchLogit(opt_ma$par[1]),2)
-    res$lambda <- round(exp(opt_ma$par[ncol(data)+1]),2)
-    res$gam    <- round(exp(opt_ma$par[ncol(data)+2]),2)
-    res$ll     <- round(opt_ma$value, 2)
-    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$phi    <- round(batchLogit(opt_ma$par[2:ncol(data)]),4)
+    res$p      <- round(batchLogit(opt_ma$par[1]),4)
+    res$lambda <- round(exp(opt_ma$par[ncol(data)+1]),4)
+    res$gam    <- round(exp(opt_ma$par[ncol(data)+2]),4)
+    res$ll     <- round(opt_ma$value, 4)
+    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
   else if(choiceModel == "model3") {
 
-    res$phi    <- round(batchLogit(opt_ma$par[1]),2)
-    res$p      <- round(batchLogit(opt_ma$par[2:(ncol(data)+1)]),2)
-    res$lambda <- round(exp(opt_ma$par[ncol(data)+2]),2)
-    res$gam    <- round(exp(opt_ma$par[ncol(data)+3]),2)
-    res$ll     <- round(opt_ma$value, 2)
-    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$phi    <- round(batchLogit(opt_ma$par[1]),4)
+    res$p      <- round(batchLogit(opt_ma$par[2:(ncol(data)+1)]),4)
+    res$lambda <- round(exp(opt_ma$par[ncol(data)+2]),4)
+    res$gam    <- round(exp(opt_ma$par[ncol(data)+3]),4)
+    res$ll     <- round(opt_ma$value, 4)
+    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
   else {
 
-    res$phi    <- round(batchLogit(opt_ma$par[1]),2)
-    res$p      <- round(batchLogit(opt_ma$par[2]),2)
-    res$lambda <- round(exp(opt_ma$par[3]),2)
-    res$gam    <- round(exp(opt_ma$par[4]),2)
-    res$ll     <- round(opt_ma$value, 2)
-    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),2)
+    res$phi    <- round(batchLogit(opt_ma$par[1]),4)
+    res$p      <- round(batchLogit(opt_ma$par[2]),4)
+    res$lambda <- round(exp(opt_ma$par[3]),4)
+    res$gam    <- round(exp(opt_ma$par[4]),4)
+    res$ll     <- round(opt_ma$value, 4)
+    res$AIC    <- round(2*opt_ma$value+2*length(opt_ma$par),4)
 
   }
 
 
-  res$U <- batchUnmark2Viterbi(par = opt_ma$par, data = data, Umax = Umax, nBins = nBins,
-                               choiceModel = choiceModel)
+  res$U <- batchUnmark2Viterbi(par = opt_ma$par, data = data, Umax = Umax, nBins = nBins, choiceModel = choiceModel)
+
+
+  # Total Abundance ------------------------------------------------------------
+
 
   # Total abundance: Marked + Unmarked abundance
   if(popSize == "Horvitz_Thompson"){
@@ -465,9 +460,208 @@ batchMarkUnmarkOptim <- function(par=NULL, data, choiceModel=c("model1", "model2
 
   res$N <- res$U + res$M
 
-  if(hessian) res$hessian <- opt_ma$hessian
-  if(parallel)parallel::stopCluster(cl = cluster)
+  serr_trans <- sqrt(diag(solve(opt_ma$hessian)))
+  serr       <- c((c(res$phi, res$p) * (1 - c(res$phi, res$p))), res$lambda, res$gam) * serr_trans
+  res$SE     <- serr
+
+  if(choiceModel == "model1"){
+
+    res$SE_phi    <- round(serr[1:(ncol(data)-1)], 4)
+    res$SE_p      <- round(serr[ncol(data):(2*(ncol(data)-1))], 4)
+    res$SE_lambda <- round(serr[2*ncol(data)], 4)
+    res$SE_gam    <- round(serr[2*ncol(data)+1], 4)
+
+  }else if(choiceModel == "model2"){
+
+    res$SE_phi    <- round(serr[2:ncol(data)], 4)
+    res$SE_p      <- round(serr[1], 4)
+    res$SE_lambda <- round(serr[ncol(data)+1], 4)
+    res$SE_gam    <- round(serr[ncol(data)+2], 4)
+
+  }else if(choiceModel == "model3"){
+
+    res$SE_phi    <- round(serr[1], 4)
+    res$SE_p      <- round(serr[2:(ncol(data)+1)], 4)
+    res$SE_lambda <- round(serr[ncol(data)+2], 4)
+    res$SE_gam    <- round(serr[ncol(data)+3], 4)
+
+  }else{
+
+    res$SE_phi    <- round(serr[1], 4)
+    res$SE_p      <- round(serr[2], 4)
+    res$SE_lambda <- round(serr[3], 4)
+    res$SE_gam    <- round(serr[4], 4)
+
+  }
+
+  # Goodness of Fit ---------------------------------------------------------
+
+  # Compute Q_gt
+
+  phi <- res$phi
+  p   <- res$p
+
+  if(length(phi) == 1) phi <- rep(phi,(ncol(data)-1))
+  if(length(p)   == 1) p   <- rep(p, ncol(data))
+
+  R     <- data[-1,1]
+  Times <- ncol(data)
+  Q_gt     <- matrix(0, nrow = length(R), ncol = Times)
+
+  for (times in 2:Times) {
+    for (i in 1:(times-1)) Q_gt[i,times] <- p[times] * prod(phi[i:(times-1)])
+  }
+
+  exp_rgt   <- R * Q_gt[, 2:ncol(Q_gt)]
+  r_gt      <- data[2:nrow(data), 2:ncol(data)]
+  rgt_error <- (r_gt - exp_rgt) / sqrt(exp_rgt)
+
+  # For the Unmarked
+  u <- data[1,] - c(0, colSums(r_gt))
+
+  F_lower <- vector(length = length(u))
+  F_upper <- vector(length = length(u))
+
+  p <- res$p
+  if(length(p) == 1) p <- rep(p, ncol(data))
+
+  for (t in 1:length(u)) {
+
+    F_lower[t] <- pbinom(round(u[t])-1, size = round(res$U[t]), prob = p[t])
+    F_upper[t] <- 1 - pbinom(round(u[t]), size = round(res$U[t]), prob = p[t])
+
+  }
+
+  z_lower       <- qnorm(F_lower)
+  z_upper       <- qnorm(F_upper)
+  low_seg       <- qqnorm(z_lower, plot.it = FALSE)
+  low_mat       <- cbind(X=low_seg$x, Y=low_seg$y)
+  res$low_clean <- low_mat[order(low_mat[,1]),]
+  up_seg        <- qqnorm(z_upper, plot.it = FALSE)
+  up_mat        <- cbind(X=up_seg$x, Y=up_seg$y)
+  res$up_clean  <- up_mat[order(up_mat[,1]),]
+  res$z_ave     <- (z_lower[order(low_mat[,1])] + z_upper[order(up_mat[,1])]) / 2
+
+  res$exp_rgt   <- exp_rgt
+  res$rgt_error <- rgt_error
+
+
+  class(res) <- "batchMarkUnmarkOptim"
 
   return(res)
 
 }
+
+
+#' Print Method for batchMarkOptim Objects
+#'
+#' This function defines how objects of class "Employee" are printed.
+#'
+#' @param x An object of class "Employee".
+#' @param ... Additional arguments passed to the print method.
+#' @rdname print.batchMarkOptim
+
+#' @export
+print.batchMarkOptim <- function(x, ...) {
+
+  tt1 <- data.frame("log-likelihood" = x$ll, "AIC" =  x$AIC)
+
+  if(length(x$p) == 1 & length(x$phi) != 1) {
+
+    x$p    <- rep(x$p, length(x$phi))
+    x$SE_p <- rep(x$SE_p, length(x$phi))
+  }
+
+  if(length(x$phi) == 1 & length(x$p) != 1){
+
+    x$phi    <- rep(x$phi, length(x$p))
+    x$SE_phi <- rep(x$SE_phi, length(x$p))
+  }
+
+  tt2 <- data.frame("p" = x$p, "p_S Error" = x$SE_p, "phi" = x$phi, "phi_S Error" = x$SE_phi)
+  tt3 <- list(knitr::kable(tt1), knitr::kable(tt2))
+
+  return(tt3)
+}
+
+#' Print Method for batchMarkUnmarkOptim Objects
+#'
+#' This function defines how objects of class "Employee" are printed.
+#'
+#' @param x An object of class "Employee".
+#' @param ... Additional arguments passed to the print method.
+#' @rdname print.batchMarkUnmarkOptim
+#' @export
+
+print.batchMarkUnmarkOptim <- function(x, ...) {
+
+  tt1 <- data.frame("log-likelihood" = x$ll, "AIC" =  x$AIC)
+
+  if(length(x$p) == 1 & length(x$phi) != 1) {
+
+    x$p       <- rep(x$p, length(x$phi))
+    x$SE_p    <- rep(x$SE_p, length(x$phi))
+
+  }
+
+  if(length(x$phi) == 1 & length(x$p) != 1){
+
+    x$phi     <- rep(x$phi, length(x$p))
+    x$SE_phi  <- rep(x$SE_phi, length(x$p))
+
+  }
+
+  tt2 <- data.frame("p" = x$p, "p_S Error" = x$SE_p, "phi" = x$phi, "phi_S Error" = x$SE_phi)
+  tt3 <- data.frame("No of Unmarked(U)" = round(x$U), "No of Marked(M)" = round(x$M), "Abundance(N)" = round(x$N))
+  tt4 <- data.frame("Lambda" = x$lambda, "Lambda_S.Error" = x$SE_lambda, "Gam" = x$gam, "Gam_S.Error" = x$SE_gam)
+  tt5 <- list(knitr::kable(tt1), knitr::kable(tt2), knitr::kable(tt3), knitr::kable(tt4))
+
+  return(tt5)
+
+}
+
+
+#' Plot Method for batchMarkUnmarkOptim Objects
+#'
+#' This function defines how objects of class "Employee" are printed.
+#'
+#' @param x An object of class "Employee".
+#' @param ... Additional arguments passed to the print method.
+#' @rdname plot.batchMarkOptim
+#' @export
+
+plot.batchMarkOptim <- function(x, ...) {
+
+  #par(mfrow = c(1,2))
+
+  plot(x=as.vector(log(x$exp_rgt)), y=as.vector(x$rgt_error), type="p",
+       xlab="log(Expected)", ylab = "(Observed-Expected) / sqrt(Expected)",
+       main="Goodness-of-fit plots", pch=1, cex=1)
+
+}
+
+
+#' Plot Method for batchMarkUnmarkOptim Objects
+#'
+#' This function defines how objects of class "Employee" are printed.
+#'
+#' @param x An object of class "Employee".
+#' @param ... Additional arguments passed to the print method.
+#' @rdname plot.batchMarkUnmarkOptim
+#' @export
+
+plot.batchMarkUnmarkOptim <- function(x, ...) {
+
+  par(mfrow = c(1,2))
+
+  plot(x=as.vector(log(x$exp_rgt)), y=as.vector(x$rgt_error), type="p",
+       xlab="log(Expected)", ylab = "(Observed-Expected) / sqrt(Expected)",
+       main="Goodness-of-fit plots", pch=1, cex=1)
+
+  {plot(range(x$low_clean[,1], x$up_clean[,1]), range(x$low_clean[,2], x$up_clean[,2]), type = "n",
+        xlab="Theoretical Quantities", ylab="Sample Quantities", main="QQ plot of the unmarked")
+    segments(x0 = x$low_clean[,1],y0 = x$low_clean[,2], x1 = x$up_clean[,1], y1 = x$up_clean[,2])
+    qqline(x$z_ave)}
+
+}
+

@@ -8,14 +8,13 @@ batchMarkUnmarkOptim(
   par = NULL,
   data,
   choiceModel = c("model1", "model2", "model3", "model4"),
+  covariate_phi = NULL,
+  covariate_p = NULL,
   method = c("Nelder-Mead", "BFGS", "CG", "L-BFGS-B"),
   Umax = 1800,
   nBins = 20,
   popSize = c("Horvitz_Thompson", "Model-Based"),
-  parallel = FALSE,
   lowerBound = -Inf,
-  cores = 1,
-  hessian = FALSE,
   control,
   ...
 )
@@ -27,6 +26,10 @@ batchMarkUnmarkOptim(
 
 \item{choiceModel}{This chooses among different models and allow for model selection}
 
+\item{covariate_phi}{This covariate placeholder for the parameter phi_t}
+
+\item{covariate_p}{This covariate placeholder for the parameter p_t}
+
 \item{method}{The method to be used. See optim for details.}
 
 \item{Umax}{The maximum number of the unmarked individuals in the population for capture on any occasion.}
@@ -35,13 +38,7 @@ batchMarkUnmarkOptim(
 
 \item{popSize}{The Horvitz_Thompson method or Model-Based to compute population size.}
 
-\item{parallel}{Logical. Should the algorithm be run in parallel? This will be implemented in a future version.}
-
 \item{lowerBound}{Lower bounds on the variables for the "L-BFGS-B" method.}
-
-\item{cores}{The number of cores for parallelization}
-
-\item{hessian}{Logical. Should a numerically differentiated Hessian matrix be returned?}
 
 \item{control}{a list of control parameters. See \code{\link{optim}} for details.}
 
@@ -53,7 +50,7 @@ A list of the following optimized parameters will be returned.
 \item{phi}{The survival probability and remaining in the population between occasion t and t+1.}
 \item{p}{The capture probability at occasion time t.}
 \item{ll}{The optimized log-likelihood value of marked model.}
-\item{hessian}{The hessian matrix.}
+\item{SE}{The standard error for each parameter.}
 \item{AIC}{The Akaike Information Criteria for model selection.}
 \item{lambda}{Initial mean abundance at occasion t = 1.}
 \item{gam}{Recruitment rate of individual into the unmarked population.}
@@ -63,7 +60,7 @@ A list of the following optimized parameters will be returned.
 }
 }
 \description{
-batchMarkUnmarkOptim function provides the batch marking and unmarked function to be optimized.
+batchMarkUnmarkOptim function optimizes \code{\link{batchMarkUnmarkHmmLL}} function.
 }
 \details{
 Note that arguments after ... must be matched exactly.
@@ -87,11 +84,12 @@ mod1 <- batchMarkUnmarkOptim(
            par         = theta,
            data        = WeatherLoach,
            Umax        = 1800,
-           nBins       = 20,
+           nBins       = 600,
+           covariate_phi = NULL,
+           covariate_p   = NULL,
            choiceModel = "model4",
            popSize    = "Horvitz_Thompson",
            method      = "CG",
-           parallel    = FALSE,
            control     = list(trace = 1))
 
  # Survival probability
@@ -100,8 +98,6 @@ mod1 <- batchMarkUnmarkOptim(
  mod1$p
  # Optimized log-likelihood
  mod1$ll
- # The Hessian matrix
- mod1$hessian
  # The Aikaike Information Criteria
  mod1$AIC
  # The initial mean abundance
@@ -121,21 +117,22 @@ mod2 <- batchMarkUnmarkOptim(
            par         = theta,
            data        = WeatherLoach,
            Umax        = 1800,
-           nBins       = 20,
+           nBins       = 600,
            choiceModel = "model4",
+           covariate_phi = NULL,
+           covariate_p   = NULL,
            popSize    = "Model-Based",
            method      = "L-BFGS-B",
-           parallel    = FALSE,
            control     = list(trace = 1))
 
+ # print(mod2)
+ # plot(mod2)
  # Survival probability
  mod2$phi
  # Capture probability
  mod2$p
  # Optimized log-likelihood
  mod2$ll
- # The Hessian matrix
- mod2$hessian
  # The Akaike Information Criteria
  mod2$AIC
  # The initial mean abundance

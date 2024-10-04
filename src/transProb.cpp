@@ -19,7 +19,7 @@ library(RcppDist)
 
 #include <RcppArmadillo.h>
 //#include <omp.h>
-#include <math.h>
+//#include <math.h>
 #include <Rcpp.h>
 
 // [[Rcpp::depends(RcppArmadillo)]]
@@ -28,7 +28,7 @@ using namespace Rcpp;
 using namespace arma;
 
 // [[Rcpp::export]]
-arma::mat gamma_gt(int R, double phi, int cores){
+arma::mat gamma_gt(int R, double phi){
 
   // Parallel
   //omp_set_dynamic(0);     // Explicitly disable dynamic teams

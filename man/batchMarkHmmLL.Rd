@@ -5,10 +5,11 @@
 \title{Log-likelihood function for marked model.}
 \usage{
 batchMarkHmmLL(
-  par,
+  par = NULL,
   data,
-  choiceModel = c("model1", "model2", "model3", "model4"),
-  cores
+  covariate_phi = NULL,
+  covariate_p = NULL,
+  choiceModel = c("model1", "model2", "model3", "model4")
 )
 }
 \arguments{
@@ -16,9 +17,11 @@ batchMarkHmmLL(
 
 \item{data}{A capture-recapture data matrix or data frame.}
 
-\item{choiceModel}{This chooses among different models and allows for model selection}
+\item{covariate_phi}{This covariate placeholder for the parameter phi_t}
 
-\item{cores}{The number of cores for parallelization.}
+\item{covariate_p}{This covariate placeholder for the parameter p_t}
+
+\item{choiceModel}{This chooses among different models and allows for model selection}
 }
 \value{
 Negative Log-likelihood value of the likelihood function
@@ -30,10 +33,11 @@ This helps users check whether the function can be optimized at the given initia
 library(extBatchMarking)
 # Initial parameter
 theta <- c(0, -1)
-res1  <- batchMarkHmmLL(par        = theta,
-                       data        = WeatherLoach,
-                       choiceModel = "model4",
-                       cores       = 1)
+res1  <- batchMarkHmmLL(par          = theta,
+                       data          = WeatherLoach,
+                       choiceModel   = "model4",
+                       covariate_phi = NULL,
+                       covariate_p   = NULL)
 res1
 
 }

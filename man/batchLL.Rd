@@ -4,7 +4,7 @@
 \alias{batchLL}
 \title{batchLL function provides the batch marking log-likelihood}
 \usage{
-batchLL(phi, p, R, begin_g, end_g, cores)
+batchLL(phi, p, R, begin_g, end_g)
 }
 \arguments{
 \item{phi}{The probability of surviving and remaining in the population between occasions t and t +1, given an individual was alive and in the population at occasion t. This must be a number between 0 and 1.}
@@ -16,8 +16,6 @@ batchLL(phi, p, R, begin_g, end_g, cores)
 \item{begin_g}{The beginning of the occasion.}
 
 \item{end_g}{The end of the occasion.}
-
-\item{cores}{Number of cores for parallel.}
 }
 \value{
 fr returns the log sum of the Hidden Markov Model.

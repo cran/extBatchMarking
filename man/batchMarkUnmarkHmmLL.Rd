@@ -9,8 +9,9 @@ batchMarkUnmarkHmmLL(
   data,
   Umax,
   nBins,
-  choiceModel = c("model1", "model2", "model3", "model4"),
-  cores
+  covariate_phi = NULL,
+  covariate_p = NULL,
+  choiceModel = c("model1", "model2", "model3", "model4")
 )
 }
 \arguments{
@@ -22,9 +23,11 @@ batchMarkUnmarkHmmLL(
 
 \item{nBins}{The number of bin size into which the matrix will be divided.}
 
-\item{choiceModel}{This chooses among different models and allow for model selection.}
+\item{covariate_phi}{This covariate placeholder for the parameter phi_t}
 
-\item{cores}{The number of cores for parallelization.}
+\item{covariate_p}{This covariate placeholder for the parameter p_t}
+
+\item{choiceModel}{This chooses among different models and allow for model selection.}
 }
 \value{
 Negative Log-likelihood value of the likelihood function.
@@ -39,7 +42,8 @@ res3  <- batchMarkUnmarkHmmLL(par        = theta,
                              data        = WeatherLoach,
                              choiceModel = "model4",
                              Umax        = 1800,
-                             nBins       = 20,
-                             cores       = 1)
+                             nBins       = 600,
+                       covariate_phi = NULL,
+                       covariate_p   = NULL)
 res3
 }
